@@ -1,44 +1,51 @@
+# pip install discord.py python-dotenv
+
 import discord
-import requests
 from discord.ext import commands, tasks
+from dotenv import load_dotenv
+import os
 
-TOKEN = 'MTMwNTc3MzQyODk4NDUxNjY0OA.GTTU_q.IPwTw4ro4FkibFKygBErknf4w7n_oNC2uzBGms'
-CHANNEL_ID = 123456789012345678  # Reemplaza con el ID del canal para los anuncios
+# Cargar el token del archivo .env
+load_dotenv()
+TOKEN = os.getenv('DISCORD_TOKEN')
 
-# Configura el bot con prefijo "/"
-bot = commands.Bot(command_prefix="/", intents=discord.Intents.default())
+# Configuración inicial del bot
+bot = commands.Bot(command_prefix="!", intents=discord.Intents.default())
 
-# Función para obtener datos de la tienda de Fortnite
-def get_store_data():
-    url = "https://fortnite-api.com/v2/shop/br"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json()
-    return None
+# Variable para almacenar el canal configurado por el usuario
+user_channel = None
 
-# Tarea periódica para enviar actualizaciones diarias de la tienda
-@tasks.loop(hours=24)
-async def daily_store_update():
-    store_data = get_store_data()
-    if store_data:
-        channel = bot.get_channel(CHANNEL_ID)
-        await channel.send(f"¡La tienda de Fortnite se ha actualizado! Aquí tienes la info: {store_data}")
+# Comando para que los administradores configuren el canal de anuncios
+@bot.command(name="set_channel")
+@commands.has_permissions(administrator=True)
+async def set_channel(ctx):
+    global user_channel
+    user_channel = ctx.channel.id
+    await ctx.send(f"Canal configurado correctamente: {ctx.channel.name}")
 
-# Comando /shopday para consultar la tienda actual
+# Comando para consultar la tienda de Fortnite en cualquier momento
 @bot.command(name="shopday")
 async def shopday(ctx):
-    store_data = get_store_data()
-    if store_data:
-        # Extrae y organiza los datos según la estructura de la API
-        items = [item["name"] for item in store_data["data"]["daily"]["entries"]]
-        items_list = "\n".join(items)
-        await ctx.send(f"Items actuales en la tienda de Fortnite:\n{items_list}")
-    else:
-        await ctx.send("No se pudo obtener la información de la tienda en este momento.")
+    shop_info = get_fortnite_shop()  # función ficticia para obtener la tienda
+    await ctx.send(f"**Tienda de Fortnite hoy:**\n{shop_info}")
 
+# Tarea que envía el anuncio de la tienda cada 24 horas
+@tasks.loop(hours=24)
+async def daily_shop_announcement():
+    if user_channel:
+        channel = bot.get_channel(user_channel)
+        if channel:
+            shop_info = get_fortnite_shop()  # función ficticia para obtener la tienda
+            await channel.send(f"**Anuncio diario de la tienda de Fortnite:**\n{shop_info}")
+
+# Función ficticia para obtener la tienda de Fortnite (deberías completar esta función)
+def get_fortnite_shop():
+    return "Información de la tienda del día..."
+
+# Inicia la tarea de anuncio diario cuando el bot se conecta
 @bot.event
 async def on_ready():
-    print(f'Bot conectado como {bot.user}')
-    daily_store_update.start()
+    daily_shop_announcement.start()
+    print(f'{bot.user} se ha conectado a Discord.')
 
 bot.run(TOKEN)
